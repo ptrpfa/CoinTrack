@@ -48,5 +48,3 @@ for item in js_wallet:
             pass
     else:
         pass
-    
-
