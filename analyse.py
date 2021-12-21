@@ -10,6 +10,14 @@ regex_swap = '^(.+)\/(.+)'
 overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0}
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Overall': 0, 'Reward': 0}, {..}}
 
+# Functions
+def date_difference (start, end=datetime.datetime.today()):
+    start = datetime.datetime.strptime(start, '%Y-%m-%d %H:%M')
+    diff = end - start
+    diff_month = end.month - start.month
+    diff_day = diff.days - (diff_month * 28) # 1 month hardcoded as 28 days
+    return "%s month(s) & %s day(s)" % (diff_month, diff_day)
+
 # Entrypoint
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
@@ -74,6 +82,14 @@ for token, holdings in overall_crypto.items():
 
 # Calculate overall investment
 overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['Referral'] - overall_wallet['Withdrawal'], 2)
+for k, v in overall_wallet.items():
+    overall_wallet[k] = round (overall_wallet[k], 2)
 
-print (overall_wallet)
-print (overall_crypto)
+print ("Wallet:", overall_wallet)
+print ("Crypto Holdings:")
+for k, v in overall_crypto.items():
+    print (k, v)
+
+# Get overall investment/trading duration
+start_date = js_trade[0]['Time & Date'] if js_trade[0]['Time & Date'] < js_wallet[0]['Date & Time (*-*)'] else js_wallet[0]['Date & Time (*-*)']
+print ('Duration:', date_difference(start_date))
