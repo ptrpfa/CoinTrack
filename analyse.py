@@ -1,5 +1,6 @@
 import os, re, json, datetime
 import pandas as pd
+from config import *
 
 # Constants
 file_dir = 'history'
@@ -9,6 +10,8 @@ regex_token = '^(.+)\/SGD'
 regex_swap = '^(.+)\/(.+)'
 overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0}
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Overall': 0, 'Reward': 0}, {..}}
+current_crypto = {}
+past_crypto = {}
 
 # Functions
 def date_difference (start, end=datetime.datetime.today()):
@@ -78,7 +81,12 @@ for item in js_trade:
 
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
-    overall_crypto[token]['Overall'] = holdings['Bought'] + holdings['Reward'] - holdings['Sold']
+    overall = holdings['Bought'] + holdings['Reward'] - holdings['Sold']
+    overall_crypto[token]['Overall'] = overall
+    if (overall > 0):
+        current_crypto[token] = overall_crypto[token]
+    else:
+        past_crypto[token] = overall_crypto[token]
 
 # Calculate overall investment
 overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['Referral'] - overall_wallet['Withdrawal'], 2)
@@ -86,8 +94,11 @@ for k, v in overall_wallet.items():
     overall_wallet[k] = round (overall_wallet[k], 2)
 
 print ("Wallet:", overall_wallet)
-print ("Crypto Holdings:")
-for k, v in overall_crypto.items():
+print ("Current crypto holdings:")
+for k, v in current_crypto.items():
+    print (k, v)
+print ("Past crypto Holdings:")
+for k, v in past_crypto.items():
     print (k, v)
 
 # Get overall investment/trading duration
