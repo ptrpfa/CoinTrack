@@ -13,14 +13,6 @@ overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Overall': 0, 'Reward':
 current_crypto = {}
 past_crypto = {}
 
-# Functions
-def date_difference (start, end=datetime.datetime.today()):
-    start = datetime.datetime.strptime(start, '%Y-%m-%d %H:%M')
-    diff = end - start
-    diff_month = end.month - start.month
-    diff_day = diff.days - (diff_month * 28) # 1 month hardcoded as 28 days
-    return "%s month(s) & %s day(s)" % (diff_month, diff_day)
-
 # Entrypoint
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
@@ -56,6 +48,7 @@ for item in js_wallet:
             overall_wallet['Referral'] += item['Amount']
         elif (item['Type (All)']=='Fiat Withdrawal'):
             overall_wallet['Withdrawal'] += item['Amount']
+            overall_wallet['Fees'] += 2
     else:
         if ('earn' not in item['Type (All)'].lower()):
             if (item['Currency(All)'] not in overall_crypto.keys()):
@@ -109,4 +102,3 @@ for k, v in past_crypto.items():
 
 # Get overall investment/trading duration
 start_date = js_trade[0]['Time & Date'] if js_trade[0]['Time & Date'] < js_wallet[0]['Date & Time (*-*)'] else js_wallet[0]['Date & Time (*-*)']
-print ('Duration:', date_difference(start_date))
