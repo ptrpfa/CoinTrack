@@ -1,21 +1,18 @@
-import os, re, json, datetime
-import pandas as pd
 from config import *
+from api import api
+import os, re, json
+import pandas as pd
 
-# Constants
-file_dir = 'history'
-regex_trade = '^trade_history.+\.csv'
-regex_wallet = '^wallet_history.+\.csv'
-regex_token = '^(.+)\/SGD'
-regex_swap = '^(.+)\/(.+)'
+# Variables
 overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0}
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}, {..}}
 current_crypto = {}
 past_crypto = {}
 
-# Entrypoint
+# Program entrypoint
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
+ch_api = api()
 
 for f in list_dir:
     if (re.match(regex_trade, f)):
@@ -23,19 +20,20 @@ for f in list_dir:
     elif (re.match(regex_wallet,f)):
         file_wallet = f
 
+# Clean trade history
 df_trade = pd.read_csv("%s/%s" % (file_dir,file_trade))
 df_trade = df_trade[df_trade['Status']=='Completed']
 df_trade.drop(columns=['Type', 'Average Price', 'Executed', 'Status'], inplace=True)
 # df_trade['Time & Date'] = pd.to_datetime (df_trade['Time & Date'], format="%d/%m/%Y %H:%M")
 df_trade.sort_values(by="Time & Date", inplace=True)
-# df_trade = df_trade.round(dp_precision)
 
+# Clean wallet history
 df_wallet = pd.read_csv("%s/%s" % (file_dir,file_wallet))
 df_wallet = df_wallet[df_wallet['Status (All)']=='Completed']
 df_wallet.drop(columns=['Transaction Hash', 'To Address', 'Received by Address', 'Fee', 'Note', 'Status (All)'], inplace=True)
 df_wallet.sort_values(by="Date & Time (*-*)", inplace=True)
-# df_wallet = df_wallet.round(dp_precision)
 
+# Convert dataframes to json
 js_trade = json.loads(df_trade.to_json(orient='records'))
 js_wallet = json.loads(df_wallet.to_json(orient='records'))
 
@@ -48,7 +46,7 @@ for item in js_wallet:
             overall_wallet['Referral'] += item['Amount']
         elif (item['Type (All)']=='Fiat Withdrawal'):
             overall_wallet['Withdrawal'] += item['Amount']
-            overall_wallet['Fees'] += 2
+            overall_wallet['Fees'] += withdrawal_fee
     else:
         if (item['Currency(All)'] not in overall_crypto.keys()):
             if (item['Type (All)']=='Earn'): # Check if any crypto is being staked
@@ -82,8 +80,10 @@ for item in js_trade:
         token_to = re.match(regex_swap, item['Pair']).group(2)
         overall_crypto[token_to]['Bought'] += item['Total']
         overall_crypto[token_from]['Sold'] += item['Amount']
-        # Get fees of crypto and convert to fiat
-        pass
+        # Get fees of token swap and convert to fiat (Note: Fees are paid in the new token's currency)
+        new_token_price = ch_api.get_price(token_to)['buy_price']
+        fees = item['Fee'] * float(new_token_price)
+        overall_wallet['Fees'] += fees
 
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
