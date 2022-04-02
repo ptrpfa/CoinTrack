@@ -1,18 +1,42 @@
 from config import *
-from api import api
+from api import Api
 import os, re, json
 import pandas as pd
 
 # Variables
-overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0}
+overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0, 'Portfolio': 0, 'Returns': 0, 'Returns Ticker': 0}
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}, {..}}
 current_crypto = {}
 past_crypto = {}
 
+def summarise ():
+
+    ticker = ''
+    if (overall_wallet['Returns Ticker'] > 0):
+        ticker = '+ '
+    elif (overall_wallet['Returns Ticker'] < 0):
+        ticker = '- '
+
+    print (f"Summary generated on: {ch_api.last_update}")
+    print(f"Principal: ${overall_wallet['Overall']}\nPortfolio Value: ${overall_wallet['Portfolio']}")
+    print(f"Returns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Overall']), 2)}%)\n")
+
+    print ("Wallet:", overall_wallet)
+    print ("Current crypto holdings:")
+    for k, v in current_crypto.items():
+        print (k, v)
+    
+    # Future implementations:
+    # 1) Token breakdown
+    #   - Purchased # (Holdings)
+    #   - Cost basis ($/share and Total $) [weighted average]
+    #   - Current price ($/share and Total $)
+    # 2) Portfolio allocations (%)
+
 # Program entrypoint
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
-ch_api = api()
+ch_api = Api()
 
 for f in list_dir:
     if (re.match(regex_trade, f)):
@@ -85,6 +109,9 @@ for item in js_trade:
         fees = item['Fee'] * float(new_token_price)
         overall_wallet['Fees'] += fees
 
+# Calculate fiat holdings!
+pass
+
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
     # Calculate staked earnings
@@ -102,14 +129,18 @@ overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['R
 for k, v in overall_wallet.items():
     overall_wallet[k] = round (overall_wallet[k], 2)
 
-print ("Wallet:", overall_wallet)
-print ("Current crypto holdings:")
-for k, v in current_crypto.items():
-    print (k, v)
-print ("Past crypto Holdings:")
-for k, v in past_crypto.items():
-    print (k, v)
+# Calculate current crypto holdings valuation
+ch_api.update_prices()
+for token in current_crypto.keys():
+    current_crypto[token]['Price'] = float(ch_api.get_price(token)['sell_price'])
+    current_crypto[token]['Current Value'] = round(current_crypto[token]['Price'] * current_crypto[token]['Overall'], 2)
+    overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + current_crypto[token]['Current Value'], 2)
+    
+overall_wallet['Returns'] = round(overall_wallet['Portfolio'] - overall_wallet['Overall'], 2)
+if (overall_wallet['Returns'] > 0):
+    overall_wallet['Returns Ticker'] = 1
+elif (overall_wallet['Returns'] < 0):
+    overall_wallet['Returns Ticker'] = -1
 
-# Get overall investment/trading duration
-start_date = js_trade[0]['Time & Date'] if js_trade[0]['Time & Date'] < js_wallet[0]['Date & Time (*-*)'] else js_wallet[0]['Date & Time (*-*)']
-pass
+# Output
+summarise()

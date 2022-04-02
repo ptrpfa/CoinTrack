@@ -2,7 +2,7 @@ from config import api_url
 from datetime import datetime
 import requests, json
 
-class api:
+class Api:
 
     # Class vars
     url = api_url
@@ -19,8 +19,8 @@ class api:
             token = i['base']
             i.pop('base')
             i.pop('counter')
-            api.prices[token] = i
-        api.last_update = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            Api.prices[token] = i
+        Api.last_update = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     def get_price(self, token):
-        return api.prices[token]
+        return Api.prices[token]
