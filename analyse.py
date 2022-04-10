@@ -4,7 +4,10 @@ import os, re, json
 import pandas as pd
 
 # Variables
-overall_wallet = {'Deposit':0, 'Withdrawal': 0, 'Referral': 0, 'Overall': 0, 'Fees': 0, 'Portfolio': 0, 'Returns': 0, 'Returns Ticker': 0}
+overall_wallet = {  'Fiat': 0, 'Deposit':0, 'Withdrawal': 0, 
+                    'Referral': 0, 'Fees': 0, 'Card Purchase': 0, 
+                    'Overall': 0, 'Principal': 0, 'Portfolio': 0, 
+                    'Returns': 0, 'Returns Ticker': 0}
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}, {..}}
 current_crypto = {}
 past_crypto = {}
@@ -18,8 +21,8 @@ def summarise ():
         ticker = '- '
 
     print (f"Summary generated on: {ch_api.last_update}")
-    print(f"Principal: ${overall_wallet['Overall']}\nPortfolio Value: ${overall_wallet['Portfolio']}")
-    print(f"Returns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Overall']), 2)}%)\n")
+    print(f"Overall: ${overall_wallet['Overall']}\nFiat Holdings: ${overall_wallet['Fiat']}\nPrincipal: ${overall_wallet['Principal']}\nPortfolio Value: ${overall_wallet['Portfolio']}")
+    print(f"Returns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\n")
 
     print ("Wallet:", overall_wallet)
     print ("Current crypto holdings:")
@@ -85,11 +88,15 @@ for item in js_wallet:
             else:
                 overall_crypto[item['Currency(All)']]['Reward'] += item['Amount']
 
+# Calculate preliminary fiat wallet holdings
+overall_wallet['Fiat'] = overall_wallet['Deposit'] + overall_wallet['Referral']
+
 # Iterate through trade transactions
 for item in js_trade:
     if (item['Side']=='Buy'):
         token = re.match(regex_token, item['Pair']).group(1)
         overall_wallet['Fees'] += float(item['Fee'])
+        overall_wallet['Fiat'] -= item['Amount']
         if (token not in overall_crypto.keys()):
             overall_crypto[token] = {'Bought': item['Total'], 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
         else:
@@ -97,6 +104,7 @@ for item in js_trade:
     elif (item['Side']=='Sell'):
         token = re.match(regex_token, item['Pair']).group(1)
         overall_wallet['Fees'] += float(item['Fee'])
+        overall_wallet['Fiat'] += item['Total']
         overall_crypto[token]['Sold'] += item['Amount']
     elif (item['Side']=='Swap'):
         # Format: BTC/DOGE (BTC to DOGE) or DOGE/BTC (DOGE to BTC)
@@ -109,8 +117,11 @@ for item in js_trade:
         fees = item['Fee'] * float(new_token_price)
         overall_wallet['Fees'] += fees
 
-# Calculate fiat holdings!
-pass
+# Get fiat wallet holdings
+overall_wallet['Fiat'] -= overall_wallet['Withdrawal']
+if (overall_wallet['Fiat'] < 0): # negative wallet balance would indicate purchase through card, which is not indicated by Coinhako's exported file
+    overall_wallet['Card Purchase'] = abs(overall_wallet['Fiat'])
+    overall_wallet['Fiat'] = 0
 
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
@@ -125,7 +136,8 @@ for token, holdings in overall_crypto.items():
         past_crypto[token] = overall_crypto[token]
 
 # Calculate overall investment
-overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['Referral'] - overall_wallet['Withdrawal'], 2)
+overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['Referral'] + overall_wallet['Fiat'] - overall_wallet['Withdrawal'], 2)
+overall_wallet['Principal'] = round (overall_wallet['Overall'] - overall_wallet['Fiat'], 2)
 for k, v in overall_wallet.items():
     overall_wallet[k] = round (overall_wallet[k], 2)
 
