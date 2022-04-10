@@ -20,12 +20,18 @@ def summarise ():
     elif (overall_wallet['Returns Ticker'] < 0):
         ticker = '- '
 
-    print (f"Summary generated on: {ch_api.last_update}")
-    print(f"Overall: ${overall_wallet['Overall']}\nFiat Holdings: ${overall_wallet['Fiat']}\nPrincipal: ${overall_wallet['Principal']}\nPortfolio Value: ${overall_wallet['Portfolio']}")
-    print(f"Returns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\n")
+    print (f"Report generated on: {ch_api.last_update}\n")
+    
+    print ('-' * 8, 'Summary', '-' * 8, sep='\n')
+    print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\nPrincipal: ${overall_wallet['Principal']}\n")
 
-    print ("Wallet:", overall_wallet)
-    print ("Current crypto holdings:")
+    print ('-' * 6, 'Wallet', '-' * 6, sep='\n')
+    print (f"Overall: ${overall_wallet['Overall']} (Principal + Fiat Holdings)\nFiat Holdings: ${overall_wallet['Fiat']}\n")
+
+    print ('-' * 16, '$ In/Out & Fees', '-' * 16, sep='\n')
+    print (f"Card Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals: + ${overall_wallet['Referral']}\nFees: - ${overall_wallet['Fees']}")
+    
+    print ("\nCurrent crypto holdings:")
     for k, v in current_crypto.items():
         print (k, v)
     
