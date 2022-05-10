@@ -1,5 +1,5 @@
 from config import *
-from api import Api
+from api import CoinhakoAPI, CoingeckoAPI
 import os, re, json
 import pandas as pd
 
@@ -11,6 +11,9 @@ overall_wallet = {  'Fiat': 0, 'Deposit':0, 'Withdrawal': 0,
 overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}, {..}}
 current_crypto = {}
 past_crypto = {}
+ch_cgid_mappings = {} # Coinhako token listings' mapping to their equivalent Coingecko IDs
+ch_api = CoinhakoAPI()
+cg_api = CoingeckoAPI()
 
 def summarise ():
 
@@ -23,13 +26,10 @@ def summarise ():
     print (f"Report generated on: {ch_api.last_update}\n")
     
     print ('-' * 8, 'Summary', '-' * 8, sep='\n')
-    print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {ticker}${overall_wallet['Returns']} ({ticker}{round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\nPrincipal: ${overall_wallet['Principal']}\n")
-
-    print ('-' * 6, 'Wallet', '-' * 6, sep='\n')
-    print (f"Overall: ${overall_wallet['Overall']} (Principal + Fiat Holdings)\nFiat Holdings: ${overall_wallet['Fiat']}\n")
+    print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {ticker}${abs(overall_wallet['Returns'])} ({ticker}{abs(overall_wallet['Returns (%)'])}%)\nPrincipal: ${overall_wallet['Principal']}\n")
 
     print ('-' * 16, '$ In/Out & Fees', '-' * 16, sep='\n')
-    print (f"Card Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals: + ${overall_wallet['Referral']}\nFees: - ${overall_wallet['Fees']}")
+    print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
     
     print ("\nCurrent crypto holdings:")
     for k, v in current_crypto.items():
@@ -39,14 +39,33 @@ def summarise ():
     # 1) Token breakdown
     #   - Purchased # (Holdings)
     #   - Cost basis ($/share and Total $) [weighted average]
+    #     ==> Calculated using the First In, First Out method, just tracking the fiat deposit/conversions along the way for ease
     #   - Current price ($/share and Total $)
     # 2) Portfolio allocations (%)
+
+    # Calculate cost basis of each crypto held
+    for crypto, holdings in current_crypto.items():
+        # Get list of trades involving current crypto token
+        trades = df_trade[df_trade['Pair'].str.contains (crypto, regex=False)]
+        # Get CoingeckoID of token
+        cgid = cg_api.get_token_cgid(crypto, holdings['Name'])
+        
+        pass
+
+def update_token_mappings():
+    mappings = {}
+    ch_api.update_prices()
+    ch_tokens = ch_api.prices
+    for token, value in ch_tokens.items():
+        token_cgid = cg_api.get_token_cgid(token, value['name'])
+        mappings[token] = token_cgid
+    return mappings
 
 # Program entrypoint
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
-ch_api = Api()
 
+# Get exported trade & wallet files
 for f in list_dir:
     if (re.match(regex_trade, f)):
         file_trade = f
@@ -84,7 +103,7 @@ for item in js_wallet:
         if (item['Currency(All)'] not in overall_crypto.keys()):
             if (item['Type (All)']=='Earn'): # Check if any crypto is being staked
                 overall_crypto[item['Currency(All)']] = {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': item['Amount'], 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
-            else:
+            else: # Track free crypto gained through Coinhako rewards
                 overall_crypto[item['Currency(All)']] = {'Bought': 0, 'Sold': 0, 'Reward': item['Amount'], 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
         else:
             if (item['Type (All)']=='Earn'): # Check if any crypto is being staked
@@ -96,6 +115,9 @@ for item in js_wallet:
 
 # Calculate preliminary fiat wallet holdings
 overall_wallet['Fiat'] = overall_wallet['Deposit'] + overall_wallet['Referral']
+
+# Update Coinhako-Coingecko token ID mappings
+ch_cgid_mappings = update_token_mappings()
 
 # Iterate through trade transactions
 for item in js_trade:
@@ -118,47 +140,63 @@ for item in js_trade:
         token_to = re.match(regex_swap, item['Pair']).group(2)
         overall_crypto[token_to]['Bought'] += item['Total']
         overall_crypto[token_from]['Sold'] += item['Amount']
+
+        # need to calculate fees separately later on
         # Get fees of token swap and convert to fiat (Note: Fees are paid in the new token's currency)
         new_token_price = ch_api.get_price(token_to)['buy_price']
         fees = item['Fee'] * float(new_token_price)
         overall_wallet['Fees'] += fees
 
-# Get fiat wallet holdings
-overall_wallet['Fiat'] -= overall_wallet['Withdrawal']
-if (overall_wallet['Fiat'] < 0): # negative wallet balance would indicate purchase through card, which is not indicated by Coinhako's exported file
-    overall_wallet['Card Purchase'] = abs(overall_wallet['Fiat'])
-    overall_wallet['Fiat'] = 0
-
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
     # Calculate staked earnings
-    overall_crypto[token]['Earned'] = holdings['Redeemed'] - holdings['Staked'] if (holdings['Redeemed'] > holdings['Staked']) else holdings['Earned']
+    overall_crypto[token]['Earned'] = (holdings['Redeemed'] - holdings['Staked']) if (holdings['Redeemed'] > holdings['Staked']) else holdings['Earned']
     holdings['Earned'] = overall_crypto[token]['Earned']
-    overall = round(holdings['Bought'] + holdings['Reward'] + holdings['Earned'] - holdings['Sold'], min_precision)
+
+    # Calculate overall holdings (overall value is rounded to a specified amount of precision to 'quantitively determine' that the user holds a particular token. This is done due to precision inconsistencies within Coinhako's exported files)
+    overall = round((holdings['Bought'] + holdings['Reward'] + holdings['Earned'] - holdings['Sold']), min_precision)
     overall_crypto[token]['Overall'] = overall
+
+    # Determine current and past token holdings
     if (overall > 0):
         current_crypto[token] = overall_crypto[token]
     else:
         past_crypto[token] = overall_crypto[token]
 
-# Calculate overall investment
-overall_wallet['Overall'] = round (overall_wallet['Deposit'] + overall_wallet['Referral'] + overall_wallet['Fiat'] - overall_wallet['Withdrawal'], 2)
-overall_wallet['Principal'] = round (overall_wallet['Overall'] - overall_wallet['Fiat'], 2)
-for k, v in overall_wallet.items():
-    overall_wallet[k] = round (overall_wallet[k], 2)
+# Calculate current fiat wallet holdings
+overall_wallet['Fiat'] -= overall_wallet['Withdrawal']
+if (overall_wallet['Fiat'] < 0): # Check for any card purchases (negative wallet balance indicate purchase through card, such purchases are not tracked/indicated in exported Coinhako files)
+    overall_wallet['Card Purchase'] = abs(overall_wallet['Fiat'])
+    overall_wallet['Fees'] += overall_wallet['Card Purchase'] * card_percentage_fee
+    overall_wallet['Fiat'] = 0
 
-# Calculate current crypto holdings valuation
-ch_api.update_prices()
+# Calculate current crypto holdings' valuation
+ch_api.update_prices() # Get current market prices
 for token in current_crypto.keys():
-    current_crypto[token]['Price'] = float(ch_api.get_price(token)['sell_price'])
+    current_token_value = ch_api.get_price(token)
+
+    current_crypto[token]['Name'] = current_token_value['name']
+
+    current_crypto[token]['Price'] = float(current_token_value['sell_price'])
     current_crypto[token]['Current Value'] = round(current_crypto[token]['Price'] * current_crypto[token]['Overall'], 2)
     overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + current_crypto[token]['Current Value'], 2)
-    
-overall_wallet['Returns'] = round(overall_wallet['Portfolio'] - overall_wallet['Overall'], 2)
+
+# Calculate overall investments (fiat)
+overall_wallet['Money In'] = round ((overall_wallet['Deposit'] + overall_wallet['Card Purchase'] + overall_wallet['Referral']), 2)
+overall_wallet['Principal'] = round ((overall_wallet['Money In'] - overall_wallet['Withdrawal'] - overall_wallet['Fiat']), 2) # Principal amount is the 'break-even' value (current fiat holdings is not counted in the principal amount as it is considered 'untouched')
+overall_wallet['Returns'] = round(overall_wallet['Portfolio'] - overall_wallet['Principal'], 2)
+overall_wallet['Returns (%)'] = round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)
+
+# to be removed
 if (overall_wallet['Returns'] > 0):
     overall_wallet['Returns Ticker'] = 1
 elif (overall_wallet['Returns'] < 0):
     overall_wallet['Returns Ticker'] = -1
+
+# Clean up
+for k, v in overall_wallet.items():
+    overall_wallet[k] = round (overall_wallet[k], 2)
+
 
 # Output
 summarise()

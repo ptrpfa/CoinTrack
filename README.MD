@@ -12,6 +12,7 @@ Better understand your personal cryptocurrency portfolio and transactions made o
 
 ### Known issues:
 - Additional fees incurred from transactions made through Credit/Debit Card (VISA) are **not reflected**. Coinhako always charges a base transaction fee of 1%, which is included in the files exported from their website. However, the additional 3% fee incurred for VISA transactions is not included in the exported files, resulting in their omission.
+Update: tracking is done via a primitive method, as there are no sure-fire way to track purchases made through card (additional processing fee not reflected in exported file)
 
 > Documentation
 
