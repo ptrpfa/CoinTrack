@@ -13,5 +13,5 @@ withdrawal_fee = 2 # Fees incurred upon withdrawal from wallet to bank account
 card_percentage_fee = 0.03 # Percentage fee for each transaction made via card
 ch_api_url = 'https://www.coinhako.com/api/v3/price/all_prices_for_mobile?counter_currency=sgd'
 
-# Coin Gecko
+# Coingecko
 cg_api_url = 'https://api.coingecko.com/api/v3'

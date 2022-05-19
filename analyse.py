@@ -3,18 +3,22 @@ from api import CoinhakoAPI, CoingeckoAPI
 import os, re, json
 import pandas as pd
 
-# Variables
+# ** Variables **
 overall_wallet = {  'Fiat': 0, 'Deposit':0, 'Withdrawal': 0, 
                     'Referral': 0, 'Fees': 0, 'Card Purchase': 0, 
                     'Overall': 0, 'Principal': 0, 'Portfolio': 0, 
                     'Returns': 0, 'Returns Ticker': 0}
-overall_crypto = {} # {'Token': {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}, {..}}
+overall_crypto = {}
+baseline_crypto = {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Send': 0, 'Receive': 0, 'Referral': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0, 'Fees': 0} # Fees are not further broken down into the sub-categories of Transfer Fees / Swap Fees
 current_crypto = {}
 past_crypto = {}
-ch_cgid_mappings = {} # Coinhako token listings' mapping to their equivalent Coingecko IDs
+
+# ** APIs **
 ch_api = CoinhakoAPI()
 cg_api = CoingeckoAPI()
+ch_cgid_mappings = {} # Coinhako token listings' mapping to their equivalent Coingecko IDs
 
+# ** Functions **
 def summarise ():
 
     ticker = ''
@@ -61,10 +65,11 @@ def update_token_mappings():
         mappings[token] = token_cgid
     return mappings
 
-# Program entrypoint
+# ** Program entrypoint **
 list_dir = os.listdir(file_dir)
 list_dir.remove('.gitignore')
 
+# ** Process trade and wallet files generated from Coinhako **
 # Get exported trade & wallet files
 for f in list_dir:
     if (re.match(regex_trade, f)):
@@ -74,23 +79,37 @@ for f in list_dir:
 
 # Clean trade history
 df_trade = pd.read_csv("%s/%s" % (file_dir,file_trade))
-df_trade = df_trade[df_trade['Status']=='Completed']
+df_trade = df_trade[df_trade['Status']=='Completed'] # Only get completed trades. Possible values include: Completed, Cancelled, Pending, Waiting for refund, Refunded
 df_trade.drop(columns=['Type', 'Average Price', 'Executed', 'Status'], inplace=True)
 # df_trade['Time & Date'] = pd.to_datetime (df_trade['Time & Date'], format="%d/%m/%Y %H:%M")
 df_trade.sort_values(by="Time & Date", inplace=True)
 
 # Clean wallet history
 df_wallet = pd.read_csv("%s/%s" % (file_dir,file_wallet))
-df_wallet = df_wallet[df_wallet['Status (All)']=='Completed']
-df_wallet.drop(columns=['Transaction Hash', 'To Address', 'Received by Address', 'Fee', 'Note', 'Status (All)'], inplace=True)
+df_wallet = df_wallet[df_wallet['Status (All)']=='Completed'] # Only get completed transactions
+df_wallet.drop(columns=['Transaction Hash', 'To Address', 'Received by Address', 'Note', 'Status (All)'], inplace=True)
 df_wallet.sort_values(by="Date & Time (*-*)", inplace=True)
 
 # Convert dataframes to json
 js_trade = json.loads(df_trade.to_json(orient='records'))
 js_wallet = json.loads(df_wallet.to_json(orient='records'))
 
+# Update Coinhako-Coingecko token ID mappings
+ch_cgid_mappings = update_token_mappings()
+
 # Iterate through wallet transactions
 for item in js_wallet:
+    # Transaction types: 
+    # Receive, Send, Fiat Deposit, Fiat Withdrawal, Sign up credit, Referral Reward, Referral Commission, 
+    # Reward Redemption, Recovery fee, Withdrawal Correction Debit, Withdrawal Correction Credit, Deposit Correction Debit, 
+    # Deposit Correction Credit, Currency Conversion Credit, Currency Conversion Debit, Withdrawal, Deposit, Redeem Code, 
+    # Earn, Redemption, OTC Debit, OTC Credit, Coinhako Bonus Credit, Coinhako Bonus Debit, Internal Transfer Credit, 
+    # Internal Transfer Debit, Company Purchase Credit, Company Purchase Debit, Account Merger Credit, Account Merger Debit, Refund
+    # 
+    # Supported transaction types: 
+    #   Fiat:     Fiat Deposit, Fiat Withdrawal, Referral Commission
+    #   Token:    Send, Receive, Referral Commission, Earn, Redemption, Reward Redemption, Coinhako Bonus Credit
+
     if (item['Currency(All)']=='SGD'):
         if (item['Type (All)']=='Fiat Deposit'):
             overall_wallet['Deposit'] += item['Amount']
@@ -101,23 +120,33 @@ for item in js_wallet:
             overall_wallet['Fees'] += withdrawal_fee
     else:
         if (item['Currency(All)'] not in overall_crypto.keys()):
+            overall_crypto[item['Currency(All)']] = baseline_crypto.copy()
             if (item['Type (All)']=='Earn'): # Check if any crypto is being staked
-                overall_crypto[item['Currency(All)']] = {'Bought': 0, 'Sold': 0, 'Reward': 0, 'Staked': item['Amount'], 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
-            else: # Track free crypto gained through Coinhako rewards
-                overall_crypto[item['Currency(All)']] = {'Bought': 0, 'Sold': 0, 'Reward': item['Amount'], 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
+                overall_crypto[item['Currency(All)']]['Staked'] = item['Amount']
+            elif (item['Type (All)']=='Referral Commission'): # Check if any crypto is obtained through referral commissions
+                overall_crypto[item['Currency(All)']]['Referral'] = item['Amount']
+            elif (item['Type (All)']=='Receive'): # Check for any crypto received (wallet transfer)
+                overall_crypto[item['Currency(All)']]['Receive'] = item['Amount']
+            elif (item['Type (All)']=='Reward Redemption') or (item['Type (All)']=='Coinhako Bonus Credit'): # Track free crypto gained through Coinhako rewards
+                overall_crypto[item['Currency(All)']]['Reward'] = item['Amount']
         else:
             if (item['Type (All)']=='Earn'): # Check if any crypto is being staked
                 overall_crypto[item['Currency(All)']]['Staked'] += item['Amount']
-            elif (item['Type (All)']=='Redemption'): # Check if any crypto staked has been redeemed
+            elif (item['Type (All)']=='Redemption'): # Check if any crypto staked has been yielded
                 overall_crypto[item['Currency(All)']]['Redeemed'] += item['Amount']
-            else:
+            elif (item['Type (All)']=='Referral Commission'): # Check if any crypto is obtained through referral commissions
+                overall_crypto[item['Currency(All)']]['Referral'] += item['Amount']
+            elif (item['Type (All)']=='Receive'): # Check for any crypto received (wallet transfer)
+                overall_crypto[item['Currency(All)']]['Receive'] += item['Amount']
+            elif (item['Type (All)']=='Send'): # Check for any crypto sent (wallet transfer)
+                overall_crypto[item['Currency(All)']]['Send'] += item['Amount']
+                # Get fees for transfer of tokens
+                overall_crypto[item['Currency(All)']]['Fees'] += item['Fee']
+            elif (item['Type (All)']=='Reward Redemption') or (item['Type (All)']=='Coinhako Bonus Credit'): # Track free crypto gained through Coinhako rewards
                 overall_crypto[item['Currency(All)']]['Reward'] += item['Amount']
 
 # Calculate preliminary fiat wallet holdings
 overall_wallet['Fiat'] = overall_wallet['Deposit'] + overall_wallet['Referral']
-
-# Update Coinhako-Coingecko token ID mappings
-ch_cgid_mappings = update_token_mappings()
 
 # Iterate through trade transactions
 for item in js_trade:
@@ -126,7 +155,8 @@ for item in js_trade:
         overall_wallet['Fees'] += float(item['Fee'])
         overall_wallet['Fiat'] -= item['Amount']
         if (token not in overall_crypto.keys()):
-            overall_crypto[token] = {'Bought': item['Total'], 'Sold': 0, 'Reward': 0, 'Staked': 0, 'Redeemed': 0, 'Earned': 0, 'Overall': 0}
+            overall_crypto[token] = baseline_crypto.copy()
+            overall_crypto[token]['Bought'] = item['Total']
         else:
              overall_crypto[token]['Bought'] += item['Total']
     elif (item['Side']=='Sell'):
@@ -138,14 +168,14 @@ for item in js_trade:
         # Format: BTC/DOGE (BTC to DOGE) or DOGE/BTC (DOGE to BTC)
         token_from = re.match(regex_swap, item['Pair']).group(1)
         token_to = re.match(regex_swap, item['Pair']).group(2)
-        overall_crypto[token_to]['Bought'] += item['Total']
+        if (token_to not in overall_crypto.keys()):
+            overall_crypto[token_to] = baseline_crypto.copy()
+            overall_crypto[token_to]['Bought'] = item['Total']
+        else:
+            overall_crypto[token_to]['Bought'] += item['Total']
         overall_crypto[token_from]['Sold'] += item['Amount']
-
-        # need to calculate fees separately later on
-        # Get fees of token swap and convert to fiat (Note: Fees are paid in the new token's currency)
-        new_token_price = ch_api.get_price(token_to)['buy_price']
-        fees = item['Fee'] * float(new_token_price)
-        overall_wallet['Fees'] += fees
+        # Get fees for token swap (Note: Fees are paid in the new token's currency, not the previous token's currency. Fees are not converted to fiat)
+        overall_crypto[token_to]['Fees'] += item['Fee']
 
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
@@ -154,7 +184,7 @@ for token, holdings in overall_crypto.items():
     holdings['Earned'] = overall_crypto[token]['Earned']
 
     # Calculate overall holdings (overall value is rounded to a specified amount of precision to 'quantitively determine' that the user holds a particular token. This is done due to precision inconsistencies within Coinhako's exported files)
-    overall = round((holdings['Bought'] + holdings['Reward'] + holdings['Earned'] - holdings['Sold']), min_precision)
+    overall = round((holdings['Bought'] + holdings['Reward'] + holdings['Earned'] + holdings['Receive'] - holdings['Sold'] - holdings['Send']), min_precision)
     overall_crypto[token]['Overall'] = overall
 
     # Determine current and past token holdings
@@ -165,6 +195,7 @@ for token, holdings in overall_crypto.items():
 
 # Calculate current fiat wallet holdings
 overall_wallet['Fiat'] -= overall_wallet['Withdrawal']
+# Requires fixing
 if (overall_wallet['Fiat'] < 0): # Check for any card purchases (negative wallet balance indicate purchase through card, such purchases are not tracked/indicated in exported Coinhako files)
     overall_wallet['Card Purchase'] = abs(overall_wallet['Fiat'])
     overall_wallet['Fees'] += overall_wallet['Card Purchase'] * card_percentage_fee
