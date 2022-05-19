@@ -23,20 +23,23 @@ class CoinhakoAPI: # Simply for getting prices offered on Coinhako platform
         CoinhakoAPI.last_update = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     def get_price(self, token):
-        return CoinhakoAPI.prices[token.upper()]
+        return CoinhakoAPI.prices[token.upper()] if token in CoinhakoAPI.prices.keys() else None
 
 class CoingeckoAPI: # For more advanced features
 
     # Class vars
     base_url = cg_api_url
+    cg_tokens = None
     
     # Coingeko endpoints
     token_map_url = base_url + '/coins/list'
 
+    def __init__(self):
+        CoingeckoAPI.cg_tokens = json.loads(requests.get(CoingeckoAPI.token_map_url).text)
+
     def get_token_cgid(self, token, name):
         cgid = None
-        cg_tokens = json.loads(requests.get(CoingeckoAPI.token_map_url).text)
-        for t in cg_tokens:
+        for t in CoingeckoAPI.cg_tokens:
             if ((t['symbol'].lower() == token.lower()) and (t['name'].lower() == name.lower())):
                 cgid = t['id']
                 break

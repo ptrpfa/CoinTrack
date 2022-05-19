@@ -22,3 +22,4 @@ Update: tracking is done via a primitive method, as there are no sure-fire way t
 2. Create and update **config.py** with the necessary API keys (refer to *sample-config.py*)
 3. Run **analyse.py**
 
+Add support for referral commission in crypto, not SGD
