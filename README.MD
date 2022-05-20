@@ -1,25 +1,25 @@
 # Coin Track - Personal Cryptocurrency portfolio
-Better understand your personal cryptocurrency portfolio and transactions made on **Coinhako**.
+Better understand your personal cryptocurrency portfolio and transactions made on **Coinhako**!
+
+## 🚀 Start here! 
+1. Save a copy of this Git repository!
+2. Download a copy of your trading and wallet history from Coinhako. Save the two files under the *history* folder (ensure that there is only one wallet and one trade file in this folder at any moment!)
+    - [Trade History](https://www.coinhako.com/wallet/history/trade)
+    - [Wallet History](https://www.coinhako.com/wallet/history/wallet)
+3. Install all required dependencies for this project.
+    ```python
+    pip install -r requirements.txt
+    ```
+4. Run **analyse.py** and view your portfolio!
+    ```python 
+    python3 analyse.py
+    ```
 
 ### Features to implement:
 - Cost per token
 - Improve date functions
-
-### Potential/future add-ons:
-- Get prices from Coinhako API
-- Get prices from CoinMarketCap API
 - Compare prices from various exchanges
 
-### Known issues:
-- Additional fees incurred from transactions made through Credit/Debit Card (VISA) are **not reflected**. Coinhako always charges a base transaction fee of 1%, which is included in the files exported from their website. However, the additional 3% fee incurred for VISA transactions is not included in the exported files, resulting in their omission.
-Update: tracking is done via a primitive method, as there are no sure-fire way to track purchases made through card (additional processing fee not reflected in exported file)
-
-> Documentation
-
-1. Download a copy of your trading and wallet history from Coinhako. Save the 2 files under the *history* folder
-    - [Trade History](https://www.coinhako.com/wallet/history/trade)
-    - [Wallet History](https://www.coinhako.com/wallet/history/wallet)
-2. Create and update **config.py** with the necessary API keys (refer to *sample-config.py*)
-3. Run **analyse.py**
-
-Add support for referral commission in crypto, not SGD
+#### Known issues / Advisory
+1. This program may not be able to accurately determine your current crypto holdings. The overall value of each token is rounded to a specified amount of precision to quantitively determine if you hold a particular token (very small token holdings may be missed). The rounding of each token is necessary due to precision inconsistencies within Coinhako's exported files.
+2. This program may not be able to provide an accurate representation of your current fiat holdings and purchases made via card. Such transactions are not specifally represented in Coinhako's exported files

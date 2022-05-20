@@ -9,8 +9,9 @@ regex_token = '^(.+)\/SGD'
 regex_swap = '^(.+)\/(.+)'
 
 # Coinhako
-withdrawal_fee = 2 # Fees incurred upon withdrawal from wallet to bank account
-card_percentage_fee = 0.03 # Percentage fee for each transaction made via card
+withdrawal_fee = 2 # Fees incurred upon withdrawal from wallet to bank account ($SGD)
+base_transaction_percentage_fee = 0.01 # Percentage fee for each transaction
+card_percentage_fee = 0.03 # Percentage fee for each transaction made via card (on top of base transaction fee, total of 4%)
 ch_api_url = 'https://www.coinhako.com/api/v3/price/all_prices_for_mobile?counter_currency=sgd'
 
 # Coingecko
