@@ -39,24 +39,20 @@ class CoingeckoAPI: # For more advanced features
 
     def get_token_cgid(self, token, name):
         cgid = None
-        for t in CoingeckoAPI.cg_tokens:
+        for t in CoingeckoAPI.cg_tokens: # Check for exact matches
             if ((t['symbol'].lower() == token.lower() or t['symbol'].lower() == name.lower()) and (t['name'].lower() == name.lower() or t['name'].lower() == token.lower())):
                 cgid = t['id']
                 break
-        # Second pass
-        # if (cgid is None): # Check for any token name matches
-        #     for t in CoingeckoAPI.cg_tokens:
-        #         if ((t['symbol'].lower() == token.lower()) and (t['name'].lower() in name.lower())):
-        #             cgid = t['id']
-        #             print (f"Second pass for {token}({name}):", cgid)
-        #             break
-        # # Last pass
-        # if (cgid is None): # Check for any one match otherwise
-        #     for t in CoingeckoAPI.cg_tokens:
-        #         if ((t['symbol'].lower() == token.lower()) or (t['name'].lower() == name.lower())):
-        #             cgid = t['id']
-        #             print (f"Last pass for {token}({name}):", cgid)
-        #             break
+        if (cgid is None): # Second pass: check for any token name matches
+            for t in CoingeckoAPI.cg_tokens:
+                if ((t['symbol'].lower() == token.lower()) and (t['name'].lower() in name.lower() or name.lower() in t['name'].lower())):
+                    cgid = t['id']
+                    break
+        if (cgid is None): # Third pass: check for any one match otherwise
+            for t in CoingeckoAPI.cg_tokens:
+                if ((t['symbol'].lower() == token.lower()) or (t['name'].lower() == name.lower())):
+                    cgid = t['id']
+                    break
         return cgid
 
     def get_token_price(self, token_cgid, date):

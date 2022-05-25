@@ -17,18 +17,19 @@ past_crypto = {}
 # ** APIs **
 ch_api = CoinhakoAPI()
 cg_api = CoingeckoAPI()
-
-# ** Functions **
-def update_token_mappings():
-    # to integrate into database storage (mappings to be manually vetted, but function can be retained as a last resort)
-    mappings = {}
-    ch_tokens = ch_api.prices
-    for token, value in ch_tokens.items():
-        token_cgid = cg_api.get_token_cgid(token, value['name'])
-        mappings[token] = token_cgid
-        if token_cgid is None:
-            print (f"No match -> Coinhako token: {token} ({value['name']}), Coingecko ID: {token_cgid}")
-    return mappings
+ch_cgid_mappings = {'1INCH': '1inch', 'AAVE': 'aave', 'ADA': 'cardano', 'ATOM': 'cosmos', 'AVAX': 'avalanche-2', 
+                    'AXS': 'axie-infinity', 'BAND': 'band-protocol', 'BAT': 'basic-attention-token', 'BCH': 'bitcoin-cash', 
+                    'BNB': 'binancecoin', 'BTC': 'bitcoin', 'BTTC': 'bittorrent', 'CEL': 'celsius-degree-token', 'CHZ': 'chiliz', 
+                    'CLV': 'clover-finance', 'COMP': 'compound-governance-token', 'CRV': 'curve-dao-token', 'DAI': 'dai', 
+                    'DOGE': 'dogecoin', 'DOT': 'polkadot', 'DYDX': 'dydx', 'EGLD': 'elrond-erd-2', 'ENJ': 'enjincoin', 
+                    'ENS': 'ethereum-name-service', 'ETH': 'ethereum', 'FIL': 'filecoin', 'FLOW': 'flow', 'FTM': 'fantom', 
+                    'FTT': 'ftx-token', 'GALA': 'gala', 'GRT': 'the-graph', 'HBAR': 'hedera-hashgraph', 'ICP': 'internet-computer', 
+                    'IMX': 'immutable-x', 'IOTA': 'iota', 'KLAY': 'klay-token', 'KSM': 'kusama', 'LINK': 'chainlink', 'LRC': 'loopring', 
+                    'LTC': 'litecoin', 'MANA': 'decentraland', 'MATIC': 'matic-network', 'MKR': 'maker', 'NEAR': 'near', 'NEO': 'neo', 
+                    'OMG': 'omisego', 'RUNE': 'rune', 'SAND': 'the-sandbox', 'SC': 'siacoin', 'SHIB': 'shiba-inu', 'SNX': 'havven', 
+                    'SOL': 'solana', 'SRM': 'serum', 'THETA': 'theta-token', 'UNI': 'uniswap', 'USDC': 'usd-coin', 'USDT': 'tether', 
+                    'VET': 'vechain', 'XLM': 'stellar', 'XMR': 'monero', 'XNO': 'nano', 'XRP': 'ripple', 'XTZ': 'tezos', 
+                    'YFI': 'yearn-finance', 'ZEC': 'zcash', 'ZIL': 'zilliqa'} # Coinhako token mappings to their equivalent Coingecko IDs (to be stored in a database)
 
 # ** Program entrypoint **
 list_dir = os.listdir(file_dir)
@@ -114,7 +115,6 @@ for item in js_wallet:
 
 # Calculate preliminary fiat wallet holdings (total incoming fiat)
 overall_wallet['Fiat'] = overall_wallet['Deposit'] + overall_wallet['Referral']
-print ("Preliminary fiat holdings:", overall_wallet['Fiat'])
 
 # Iterate through trade transactions
 for item in js_trade:
@@ -198,13 +198,14 @@ for token in current_crypto.keys():
 for crypto, holdings in current_crypto.items():
     # Get list of trades involving current crypto token
     trades = df_trade[df_trade['Pair'].str.contains(crypto, regex=False)]
-    # Get CoingeckoID of token
-    cgid = cg_api.get_token_cgid(crypto, holdings['Name'])
-    
-    pass
+    # Get Coingecko ID of token
+    if (crypto in ch_cgid_mappings.keys()):
+        cgid = ch_cgid_mappings[crypto]
+    else:
+        cgid = cg_api.get_token_cgid(crypto, holdings['Name'])
+        ch_cgid_mappings[crypto] = cgid # (to implement handling for no match, CGID = None)
 
-# Update Coinhako-Coingecko token ID mappings
-# ch_cgid_mappings = update_token_mappings()
+    pass
 
 # ** Calculate overall investments **
 incoming_cash = overall_wallet['Deposit'] + overall_wallet['Card Purchase'] + overall_wallet['Referral']
@@ -223,4 +224,4 @@ print (f"Report generated on: {ch_api.last_update}\n")
 print ('-' * 8, 'Summary', '-' * 8, sep='\n')
 print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {overall_wallet['Returns']} ({round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\nPrincipal: ${overall_wallet['Principal']}\n")
 print ('-' * 16, '$ In/Out & Fees', '-' * 16, sep='\n')
-print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
+print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nTotal cash injected: ${overall_wallet['Deposit'] + overall_wallet['Card Purchase']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
