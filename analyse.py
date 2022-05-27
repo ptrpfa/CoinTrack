@@ -4,13 +4,36 @@ import os, re, json
 import pandas as pd
 
 # ** Variables **
-overall_wallet = {  'Fiat': 0, 'Deposit': 0, 'Withdrawal': 0, 'Referral': 0, 'Fees': 0, 'Card Purchase': 0, 
-                    'Principal': 0, 'Portfolio': 0, 'Returns': 0}
+overall_wallet = {  
+                    'Deposit': 0,       # Total fiat deposited
+                    'Card Purchase': 0, # Total fiat paid via card purchases
+                    'Withdrawal': 0,    # Total fiat withdrawn
+                    'Referral': 0,      # Fiat obtained from referral commissions
+                    'Fees': 0,          # Total fees paid
+                    'Fiat': 0,          # Current fiat holdings
+                    'Principal': 0,     # Principal (break-even) amount
+                    'Portfolio': 0,     # Current portfolio fiat value
+                    'Returns': 0        # Current portfolio returns
+                }
 overall_crypto = {}
-baseline_crypto = {'Bought': 0, 'Sold': 0, 'Reward': 0, 
-                   'Send': 0, 'Receive': 0, 'Referral': 0, 
-                   'Staked': 0, 'Redeemed': 0, 'Earned': 0, 
-                   'Overall': 0, 'Fees': 0} # Fees are not further broken down into the sub-categories of Transfer Fees / Swap Fees
+baseline_crypto = { 
+                    'Bought': 0,        # Total crypto bought 
+                    'Sold': 0,          # Total crypto sold
+                    'Send': 0,          # Total crypto sent to wallet
+                    'Receive': 0,       # Total crypto received from wallet transfer 
+                    'Staked': 0,        # Total crypto staked
+                    'Redeemed': 0,      # Total crypto redeemed from staking
+                    'Earned': 0,        # Total crypto successfully yielded after staking
+                    'Reward': 0,        # Total crypto obtained from rewards
+                    'Referral': 0,      # Total crypto obtained from referral commissions
+                    'Free': 0,          # Total crypto obtained at no cost (rewards, referral commissions, staking yields)
+                    'Fees': 0,          # Total fees paid. Fees are not further broken down into the sub-categories of Transfer Fees / Swap Fees
+                    'Overall': 0,       # Total crypto that user is currently holding on
+                    'Money In': 0,      # For cost basis calculations: Total money (fiat) used to purchase token
+                    'Money Out': 0,     # For cost basis calculations: Temporary storage to track movement of money out (sell/swap transactions)
+                    'Current': 0,       # For cost basis calculations: Temporary storage to track the amount of tokens at any one time
+                    'Average Cost': 0   # For cost basis calculations: Average cost per token ($/token)
+                }
 current_crypto = {}
 past_crypto = {}
 
@@ -30,6 +53,13 @@ ch_cgid_mappings = {'1INCH': '1inch', 'AAVE': 'aave', 'ADA': 'cardano', 'ATOM': 
                     'SOL': 'solana', 'SRM': 'serum', 'THETA': 'theta-token', 'UNI': 'uniswap', 'USDC': 'usd-coin', 'USDT': 'tether', 
                     'VET': 'vechain', 'XLM': 'stellar', 'XMR': 'monero', 'XNO': 'nano', 'XRP': 'ripple', 'XTZ': 'tezos', 
                     'YFI': 'yearn-finance', 'ZEC': 'zcash', 'ZIL': 'zilliqa'} # Coinhako token mappings to their equivalent Coingecko IDs (to be stored in a database)
+
+# ** Functions **
+def calculate_token_balance(token_holdings): # Calculate overall token holdings
+    incoming  = token_holdings['Bought'] +  token_holdings['Earned'] + token_holdings['Reward'] + token_holdings['Referral'] + token_holdings['Receive']
+    outgoing = token_holdings['Sold'] + token_holdings['Send']
+    overall = incoming - outgoing
+    return overall
 
 # ** Program entrypoint **
 list_dir = os.listdir(file_dir)
@@ -63,11 +93,12 @@ js_wallet = json.loads(df_wallet.to_json(orient='records'))
 # Iterate through wallet transactions
 for item in js_wallet:
     # Coinhako transaction types: 
-    #   Receive, Send, Fiat Deposit, Fiat Withdrawal, Sign up credit, Referral Reward, Referral Commission, 
-    #   Reward Redemption, Recovery fee, Withdrawal Correction Debit, Withdrawal Correction Credit, Deposit Correction Debit, 
-    #   Deposit Correction Credit, Currency Conversion Credit, Currency Conversion Debit, Withdrawal, Deposit, Redeem Code, 
-    #   Earn, Redemption, OTC Debit, OTC Credit, Coinhako Bonus Credit, Coinhako Bonus Debit, Internal Transfer Credit, 
-    #   Internal Transfer Debit, Company Purchase Credit, Company Purchase Debit, Account Merger Credit, Account Merger Debit, Refund
+    #   Fiat: Fiat Deposit, Fiat Withdrawal, Referral Commission
+    #   Token: Send, Receive, Referral Commission, Earn, Redemption, Reward Redemption, Coinhako Bonus Credit
+    #   Misc: Sign up credit, Referral Reward, , Recovery fee, Withdrawal Correction Debit, Withdrawal Correction Credit, 
+    #         Deposit Correction Debit, Deposit Correction Credit, Currency Conversion Credit, Currency Conversion Debit, Withdrawal, Deposit, 
+    #         Redeem Code, OTC Debit, OTC Credit, Coinhako Bonus Debit, Internal Transfer Credit, Internal Transfer Debit, Company Purchase Credit, 
+    #         Company Purchase Debit, Account Merger Credit, Account Merger Debit, Refund
     # 
     # Supported transaction types: 
     #   Fiat:     Fiat Deposit, Fiat Withdrawal, Referral Commission
@@ -113,6 +144,18 @@ for item in js_wallet:
             elif (item['Type (All)']=='Reward Redemption') or (item['Type (All)']=='Coinhako Bonus Credit'): # Track free crypto gained through Coinhako rewards
                 overall_crypto[item['Currency(All)']]['Reward'] += item['Amount']
 
+# Calculate crypto obtained for free
+for token, holdings in overall_crypto.items():
+    # Calculate staked earnings
+    holdings['Earned'] = (holdings['Redeemed'] - holdings['Staked']) if (holdings['Redeemed'] > holdings['Staked']) else holdings['Earned']
+    overall_crypto[token]['Earned'] = holdings['Earned']
+    # Crypto obtained for free includes: staked earnings, referral commissions, rewards
+    overall_crypto[token]['Free'] = holdings['Earned'] + holdings['Referral'] + holdings['Reward']
+
+    #   Free tokens: Receive (to get fiat value as of time of transfer), --> Hold off implementation first 
+    #                Redemption (derived overall value, if any), Referral, Reward
+    #   Untracked tokens: Send
+
 # Calculate preliminary fiat wallet holdings (total incoming fiat)
 overall_wallet['Fiat'] = overall_wallet['Deposit'] + overall_wallet['Referral']
 
@@ -133,11 +176,28 @@ for item in js_trade:
             overall_crypto[token]['Bought'] = item['Total']
         else:
              overall_crypto[token]['Bought'] += item['Total']
+        # Cost basis calculations
+        overall_crypto[token]['Money In'] += item['Amount']
+        overall_crypto[token]['Current'] = calculate_token_balance(overall_crypto[token])
+        overall_crypto[token]['Average Cost'] = overall_crypto[token]['Money In'] / overall_crypto[token]['Current']
     elif (item['Side']=='Sell'):
         token = re.match(regex_token, item['Pair']).group(1)
         overall_wallet['Fees'] += float(item['Fee'])
         overall_wallet['Fiat'] += item['Total']
         overall_crypto[token]['Sold'] += item['Amount']
+        # Cost basis calculations
+        overall_crypto[token]['Current'] = calculate_token_balance(overall_crypto[token])
+        overall_crypto[token]['Money Out'] = item['Total'] # Money out doesn't account for fees paid, so break-even price will always be slightly higher!
+        if (overall_crypto[token]['Money In'] > 0): 
+            if (overall_crypto[token]['Money In'] > item['Total']): 
+                overall_crypto[token]['Money In'] -= item['Total']
+                overall_crypto[token]['Average Cost'] = overall_crypto[token]['Money In'] / overall_crypto[token]['Current']
+            else: # If the amount sold is more than the money in, it means the token is being sold for a profit/broke even
+                overall_crypto[token]['Money In'] = 0
+                overall_crypto[token]['Average Cost'] = 0
+        else: # If the total money in is 0 (broke-even), don't do anything
+            overall_crypto[token]['Money In']= 0
+            overall_crypto[token]['Average Cost'] = 0
     elif (item['Side']=='Swap'):
         # Format: FROM/TO ie BTC/DOGE (BTC to DOGE) or DOGE/BTC (DOGE to BTC)
         token_from = re.match(regex_swap, item['Pair']).group(1)
@@ -152,16 +212,32 @@ for item in js_trade:
         # Get fees for token swap (Note: Fees are paid in the new token's currency, not the previous token's currency. Fees are not converted to fiat)
         overall_crypto[token_to]['Fees'] += item['Fee']
 
+        # Cost basis calculations
+        # old token calculations
+        overall_crypto[token_from]['Current'] = calculate_token_balance(overall_crypto[token_from])
+        if (overall_crypto[token_from]['Money In'] > 0): # Check if there is money pumped into the token by the user
+            overall_crypto[token_from]['Money Out'] = item['Amount'] * overall_crypto[token_from]['Average Cost'] # Calculate movement of money out of old token
+            if (overall_crypto[token_from]['Money In'] > overall_crypto[token_from]['Money Out']): 
+                overall_crypto[token_from]['Money In'] -= overall_crypto[token_from]['Money Out']
+                overall_crypto[token_from]['Average Cost'] = overall_crypto[token_from]['Money In'] / overall_crypto[token_from]['Current']
+            else: # If money out is more than money in, this means the token is being sold for a profit/broke even
+                overall_crypto[token_from]['Money In'] = 0
+                overall_crypto[token_from]['Average Cost'] = 0
+        else: # Break even / Profits
+            overall_crypto[token_from]['Money Out'] = 0
+            overall_crypto[token_from]['Money In'] = 0
+            overall_crypto[token_from]['Average Cost'] = 0
+
+        # new token calculations
+        overall_crypto[token_to]['Current'] = calculate_token_balance(overall_crypto[token_to])
+        if (overall_crypto[token_from]['Money Out'] > 0): # Check if there are money movement
+            overall_crypto[token_to]['Money In'] += overall_crypto[token_from]['Money Out']
+            overall_crypto[token_to]['Average Cost'] = overall_crypto[token_to]['Money In'] / overall_crypto[token_to]['Current']
+
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
-    # Calculate staked earnings
-    holdings['Earned'] = (holdings['Redeemed'] - holdings['Staked']) if (holdings['Redeemed'] > holdings['Staked']) else holdings['Earned']
-    overall_crypto[token]['Earned'] = holdings['Earned']
-    # Calculate overall token holdings
-    incoming  = holdings['Bought'] + holdings['Reward'] + holdings['Receive'] + holdings['Referral'] + holdings['Earned']
-    outgoing = holdings['Sold'] + holdings['Send']
     # Overall value is rounded to a specified amount of precision to 'quantitively determine' that the user holds a particular token. This is done due to precision inconsistencies within Coinhako's exported files
-    overall = round(incoming - outgoing, min_precision)
+    overall = round(calculate_token_balance(holdings), min_precision)
     overall_crypto[token]['Overall'] = overall
 
     # Separate current and past token holdings into two dicts
