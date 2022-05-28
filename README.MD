@@ -17,16 +17,16 @@ Better understand your personal cryptocurrency portfolio and transactions made o
 
 ### Notes
 1. The cost basis calculations for each token will include crypto holdings received from wallet transfers. However, the fiat value (or money injected) for such tokens will not be included into the principal value. This is due to the lack of information on how much these tokens were purchased for from their previous wallet/exchanges.
-    - For example if $10 worth of $ETH was purchased from an exchange and transferred to a user, this extra $10 will not be included in the calculation of the user's principal value.
-2. The principal value calculated will not include past crypto holdings that has been transferred out to other wallets.
-    - For current token holdings that has a history of transfers out to other wallets, the cost basis of such tokens will be higher.
+    - For example if $10 worth of $ETH was purchased from an exchange and transferred to a user, this extra $10 will not be included in the calculation of the user's principal value. However, the $ETH transferred will be included in the calculations for $ETH's cost basis.
+2. The principal value calculated will not include past crypto holdings that have been transferred out to other wallets.
+    - For example if $20 worth of $BTC was transferred out to the user's external wallet, this $20 will be excluded during the calculation of the user's principal value.
 
 ### Warnings & Advisory / Known Issues
 1. This program utilises the Coinhako and Coingecko APIs. Limitations of each API will naturally result in limited functionalities, where appropriate.
 2. This program may not be able to accurately determine your current crypto holdings. The overall value of each token is rounded to a specified amount of precision to quantitively determine if you hold a particular token. This is necessary due to the precision inconsistencies of Coinhako's exported files. As result, very small token holdings may be missed.
 3. This program may not be able to provide an accurate representation of your current fiat holdings and purchases made via card. This is due to the lack of proper representations within Coinhako's exported files.
 4. The cost basis calculated for each token represents the **average cost per unit token**. It basically means the minimum amount the token should be valued at, for the user to break even. If the cost basis is zero, this means that the user has already broken even and can sell the token for a profit! There are a few things to note regarding tokens' cost basis:
-    - Coinhako charges a fee for every transaction made. This fee is not taken into consideration during the calculation of a token's cost basis. As a result, the cost basis reflected *may be higher* than the true cost basis of a token, depending on the amount of fees are paid.
+    - Coinhako charges a fee for every transaction made. This fee is not taken into consideration during the calculation of a token's cost basis. As a result, the cost basis reflected *may be higher* than the true cost basis of a token, depending on the amount of fees paid.
     - Free crypto obtained through staking yields, rewards and referral commissions are included in the calculation of a token's cost basis. As a result, the cost basis reflected *may be lower* than the true cost basis of a token, depending on how much free crypto was obtained.
     - Taking into account of these factors, the cost basis of a token may not be 100% accurate. However, the margin of error should be fairly negligble.
 5. Due to the reasons mentioned in (4), the sum of the calculated amount of money that a user injects into each token that they are holding may not be the same as the derived principal value. In this case, users should adopt a maximalist approach and take the higher value as their principal amount to ensure that their holdings break-even/profit!

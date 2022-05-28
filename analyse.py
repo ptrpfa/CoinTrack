@@ -8,6 +8,7 @@ overall_wallet = {
                     'Deposit': 0,       # Total fiat deposited
                     'Card Purchase': 0, # Total fiat paid via card purchases
                     'Withdrawal': 0,    # Total fiat withdrawn
+                    'Transfer Out': 0,  # Total fiat transferred out via crypto transfers to other wallet
                     'Referral': 0,      # Fiat obtained from referral commissions
                     'Fees': 0,          # Total fees paid
                     'Fiat': 0,          # Current fiat holdings
@@ -55,9 +56,9 @@ ch_cgid_mappings = {'1INCH': '1inch', 'AAVE': 'aave', 'ADA': 'cardano', 'ATOM': 
                     'YFI': 'yearn-finance', 'ZEC': 'zcash', 'ZIL': 'zilliqa'} # Coinhako token mappings to their equivalent Coingecko IDs (to be stored in a database)
 
 # ** Functions **
-def calculate_token_balance(token_holdings): # Calculate overall token holdings
+def calculate_token_balance(token_holdings, include_send = False): # Calculate overall token holdings
     incoming  = token_holdings['Bought'] +  token_holdings['Earned'] + token_holdings['Reward'] + token_holdings['Referral'] + token_holdings['Receive']
-    outgoing = token_holdings['Sold'] + token_holdings['Send']
+    outgoing = token_holdings['Sold'] if not include_send else (token_holdings['Sold'] + token_holdings['Send']) # By default, don't include token that were sent out
     overall = incoming - outgoing
     return overall
 
@@ -238,25 +239,40 @@ for token, holdings in overall_crypto.items():
     # Overall value is rounded to a specified amount of precision to 'quantitively determine' that the user holds a particular token. This is done due to precision inconsistencies within Coinhako's exported files
     overall = round(calculate_token_balance(holdings), min_precision)
     overall_crypto[token]['Overall'] = overall
-
     # Clean up cost basis
     overall_crypto[token]['Money Out'] = 0 # reset
     overall_crypto[token]['Current'] = overall
     overall_crypto[token]['Money In'] = round(overall_crypto[token]['Money In'], 2)
     if (overall_crypto[token]['Money In'] > 0 and overall > 0):
-        overall_crypto[token]['Average Cost'] = round(overall_crypto[token]['Money In'] / overall, 2)
+        overall_crypto[token]['Average Cost'] = round(overall_crypto[token]['Money In'] / overall, min_precision)
     else:
         overall_crypto[token]['Average Cost'] = 0
-    
     # Separate current and past token holdings into two dicts
     if (overall > 0):
-        current_crypto[token] = overall_crypto[token]
+        if (overall_crypto[token]['Send'] > 0): # Check if any crypto was transferred out
+            if (overall_crypto[token]['Average Cost'] > 0): # get fiat value being transferred away
+                overall_wallet['Transfer Out'] += overall_crypto[token]['Send'] * overall_crypto[token]['Average Cost']
+            overall = round(calculate_token_balance(holdings, True), min_precision) # re-calculate current token holdings
+            overall_crypto[token]['Overall'] = overall
+            overall_crypto[token]['Current'] = overall
+            if (overall_crypto[token]['Money In'] > 0 and overall > 0): # re-calculate cost basis
+                overall_crypto[token]['Average Cost'] = round(overall_crypto[token]['Money In'] / overall, min_precision)
+            else:
+                overall_crypto[token]['Average Cost'] = 0
+            if (overall > 0):  # check remaining amount of crypto after transfers
+                current_crypto[token] = overall_crypto[token]
+            else:
+                past_crypto[token] = overall_crypto[token]
+        else:
+            current_crypto[token] = overall_crypto[token]
     else:
         past_crypto[token] = overall_crypto[token]
 
 # Calculate current crypto holdings' valuation
 ch_api.update_prices() # Get current market prices from Coinhako
 for token in current_crypto.keys():
+    # implement error handling of tokens that are not listed in Coinhako/delisted (maybe use Coingecko as backup)
+    pass
     # Add portofolio attributes
     current_token = ch_api.get_price(token)
     current_crypto[token]['Name'] = current_token['name']
@@ -270,13 +286,11 @@ for k, v in overall_wallet.items(): # Clean up wallet
     overall_wallet[k] = round(overall_wallet[k], 2)
 overall_wallet['Fiat'] -= overall_wallet['Withdrawal'] # Get current fiat wallet holdings
 incoming_cash = overall_wallet['Deposit'] + overall_wallet['Card Purchase'] + overall_wallet['Referral'] # Get total cash user injected into platform
-# Calculate overall investment principal amount ('break-even' value). Users' current fiat holdings are not counted in the principal amount as they are considered 'untouched'
-# Principal does not include the fiat value of crypto received via wallet transfer. 
-# To incorporate removal of capital for tokens that have been sent out to personal wallets
-overall_wallet['Principal'] = incoming_cash - overall_wallet['Withdrawal'] - overall_wallet['Fiat']
-
-# Calculate investment returns
-overall_wallet['Returns'] = overall_wallet['Portfolio'] - overall_wallet['Principal']
+# Calculate overall investment principal amount ('break-even' value). Users' current fiat holdings are not counted in the principal amount as they are 
+# considered 'untouched'. The principal value does not include the fiat value of crypto received via wallet transfer. It also does not include the fiat
+# value/capital of tokens that have been sent out to personal wallets.
+overall_wallet['Principal'] = incoming_cash - overall_wallet['Withdrawal'] - overall_wallet['Fiat'] - overall_wallet['Transfer Out']
+overall_wallet['Returns'] = overall_wallet['Portfolio'] - overall_wallet['Principal'] # Calculate investment returns
 for k, v in overall_wallet.items(): # Clean up wallet
     overall_wallet[k] = round(overall_wallet[k], 2)
 
@@ -307,4 +321,4 @@ print (f"Report generated on: {ch_api.last_update}\n")
 print ('-' * 8, 'Summary', '-' * 8, sep='\n')
 print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {overall_wallet['Returns']} ({round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\nPrincipal: ${overall_wallet['Principal']}\n")
 print ('-' * 16, '$ In/Out & Fees', '-' * 16, sep='\n')
-print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nTotal cash injected: ${overall_wallet['Deposit'] + overall_wallet['Card Purchase']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
+print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nTotal cash injected: ${overall_wallet['Deposit'] + overall_wallet['Card Purchase']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nTransferred out: ${overall_wallet['Transfer Out']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
