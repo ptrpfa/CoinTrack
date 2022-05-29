@@ -292,6 +292,7 @@ for token, holdings in overall_crypto.items():
             overall_crypto[token]['Name'] = token_details['name']
             overall_crypto[token]['Price'] = float(token_details['price'])
             overall_crypto[token]['Current Value'] = round(overall_crypto[token]['Price'] * overall_crypto[token]['Overall'], 2)
+
 # Calculate user's current portfolio (current crypto holdings' valuation)
 for k, v in current_crypto.items():
     # Calculate overall portfolio
@@ -319,8 +320,7 @@ for k, v in overall_wallet.items(): # Clean up wallet
 #     ==> Calculated using the First In, First Out method, just tracking the fiat deposit/conversions along the way for ease
 #   - Current price ($/share and Total $)
 # 2) Portfolio allocations (%)
-# 3) Free tokens: Redemption (derived overall value, if any), Referral, Reward
-# Past tokens that still have money in value indicates that they were sold at a LOST
+# Past tokens whose money in value > 0 indicates that they were sold/swapped at a LOSS (value indicates loss incurred)
 
 # In-depth token analysis
 for crypto, holdings in overall_crypto.items():
@@ -329,8 +329,13 @@ for crypto, holdings in overall_crypto.items():
     # to implement error handling when the token metadata are None (name, price, current value, cgid)
 
 # ** Report **
-print (f"Report generated on: {ch_api.last_update}\n")
-print ('-' * 8, 'Summary', '-' * 8, sep='\n')
-print(f"Portfolio Value: ${overall_wallet['Portfolio']}\nReturns: {overall_wallet['Returns']} ({round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\nPrincipal: ${overall_wallet['Principal']}\n")
-print ('-' * 16, '$ In/Out & Fees', '-' * 16, sep='\n')
-print (f"Current Fiat Holdings: ${overall_wallet['Fiat']}\nCard Purchase: ${overall_wallet['Card Purchase']}\nFiat Deposit: ${overall_wallet['Deposit']}\nTotal cash injected: ${overall_wallet['Deposit'] + overall_wallet['Card Purchase']}\nWithdrawals: ${overall_wallet['Withdrawal']}\nTransferred out: ${overall_wallet['Transfer Out']}\nReferrals Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}")
+print(f"Report generated on: {ch_api.last_update}")
+print('-' * 8, 'Summary', '-' * 8, sep='\n')
+print(f"Principal Value: ${overall_wallet['Principal']}\nCurrent Portfolio Valuation: ${overall_wallet['Portfolio']}\nPortfolio Performance: {overall_wallet['Returns']} ({round(100 * (overall_wallet['Returns'] / overall_wallet['Principal']), 2)}%)\n")
+print('-' * 11, 'Fiat Wallet', '-' * 11, sep='\n')
+print(f"Total Cash Injected: ${overall_wallet['Deposit'] + overall_wallet['Card Purchase']}\n  - Fiat Deposit: ${overall_wallet['Deposit']}\n  - Card Purchase: ${overall_wallet['Card Purchase']}\nTotal Cash Out: ${overall_wallet['Withdrawal'] + overall_wallet['Transfer Out']}\n  - Cash Withdrawn: ${overall_wallet['Withdrawal']}\n  - Cash Transferred Out: ${overall_wallet['Transfer Out']}\nCurrent Fiat Holdings: ${overall_wallet['Fiat']}\nReferral Commissions Earned: ${overall_wallet['Referral']}\nFees Paid: ${overall_wallet['Fees']}\n")
+if (len(current_crypto.keys()) > 0):
+    print('-' * 14, 'Crypto Holdings', '-' * 14, sep='\n')
+    for k, v in current_crypto.items():
+        print(f"{v['Name']} (${k}):")
+        print(f"  Holdings: {v['Overall']}\n  Total money in: ${v['Money In']}\n  Current value: ${v['Current Value']}\n  Average Cost: ${v['Average Cost']}/{k}\n  Current Price: ${v['Price']}/{k}")

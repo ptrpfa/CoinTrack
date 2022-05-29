@@ -1,6 +1,24 @@
 # Coin Track - Personal Cryptocurrency portfolio
 Better understand your personal cryptocurrency portfolio and transactions made on **Coinhako**!
 
+## 👀 Portfolio Analysis / Features
+- Principal value of portfolio (valuation for user to break even)
+- Crypto portfolio
+    - Overall valuation
+    - Performance against principal value
+- Fiat wallet analysis
+    - Current wallet holdings
+    - Cash injected and breakdown of means of injection
+    - Cash withdrawn to user's bank account
+    - Cash transferred out to external crypto wallets
+    - Referral commissions earned
+    - Fees paid
+- Token analysis
+    - Current token holdings
+    - Transactions breakdown
+    - Portfolio allocations
+    - Cost basis (minimum price per unit token for user to break even)
+
 ## 🚀 Start here! 
 1. Download a copy of this Git repository!
 2. Download a copy of your trading and wallet history from Coinhako. Save the two files under the *history* folder (ensure that there is only one wallet and one trade file in this folder at any moment!)
