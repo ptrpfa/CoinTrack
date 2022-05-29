@@ -34,9 +34,10 @@ Better understand your personal cryptocurrency portfolio and transactions made o
     ```
 
 ### Notes
-1. The cost basis calculations for each token will include crypto holdings received from wallet transfers. However, the fiat value (or money injected) for such tokens will not be included into the principal value. This is due to the lack of information on how much these tokens were purchased for from their previous wallet/exchanges.
+1. Cost basis for each token is calculated by tracking the movement of fiat deposits/conversions along each transaction. The cost basis is calculated by dividing the total money the user injected into a token over the total token holdings.
+2. The cost basis calculations for each token will include crypto holdings received from wallet transfers. However, the fiat value (or money injected) for such tokens will not be included into the principal value. This is due to the lack of information on how much these tokens were purchased for from their previous wallet/exchanges.
     - For example if $10 worth of $ETH was purchased from an exchange and transferred to a user, this extra $10 will not be included in the calculation of the user's principal value. However, the $ETH transferred will be included in the calculations for $ETH's cost basis.
-2. The principal value calculated will not include past crypto holdings that have been transferred out to other wallets.
+3. The principal value calculated will not include past crypto holdings that have been transferred out to other wallets.
     - For example if $20 worth of $BTC was transferred out to the user's external wallet, this $20 will be excluded during the calculation of the user's principal value.
 
 ### Warnings & Advisory / Known Issues

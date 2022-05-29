@@ -41,6 +41,7 @@ baseline_crypto = {
                 }
 current_crypto = {} # Dictionary holding references to crypto tokens that the user current owns (changes made will propagate to overall_crypto and vice versa)
 past_crypto = {}    # Dictionary holding references to crypto tokens that the user owned previously (changes made will propagate to overall_crypto and vice versa)
+total_money_in = 0  # Track total money injected by user per token (for calculating portfolio allocations)
 
 # ** APIs **
 ch_api = CoinhakoAPI()
@@ -267,10 +268,12 @@ for token, holdings in overall_crypto.items():
                 overall_crypto[token]['Average Cost'] = 0
             if (overall > 0):  # check remaining amount of crypto after transfers
                 current_crypto[token] = overall_crypto[token]
+                total_money_in += current_crypto[token]['Money In']
             else:
                 past_crypto[token] = overall_crypto[token]
         else:
             current_crypto[token] = overall_crypto[token]
+            total_money_in += current_crypto[token]['Money In']
     else:
         past_crypto[token] = overall_crypto[token]
     # Get token metadata
@@ -298,6 +301,9 @@ for k, v in current_crypto.items():
     # Calculate overall portfolio
     if (v['Current Value'] != None):
         overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + v['Current Value'], 2)
+    # Calculate portfolio allocation
+    if (v['Money In'] > 0):
+        overall_crypto[k]['Portfolio Allocation'] = round(100 * (v['Money In'] / total_money_in), 2)
 
 # ** Calculate overall investments **
 for k, v in overall_wallet.items(): # Clean up wallet
@@ -313,20 +319,11 @@ for k, v in overall_wallet.items(): # Clean up wallet
     overall_wallet[k] = round(overall_wallet[k], 2)
 
 # ** In-depth analysis **
-# Future implementations:
-# 1) Token breakdown
-#   - Purchased # (Holdings)
-#   - Cost basis ($/share and Total $) [weighted average]
-#     ==> Calculated using the First In, First Out method, just tracking the fiat deposit/conversions along the way for ease
-#   - Current price ($/share and Total $)
-# 2) Portfolio allocations (%)
-# Past tokens whose money in value > 0 indicates that they were sold/swapped at a LOSS (value indicates loss incurred)
-
-# In-depth token analysis
-for crypto, holdings in overall_crypto.items():
-    # Get list of trades involving current crypto token
-    trades = df_trade[df_trade['Pair'].str.contains(crypto, regex=False)]
-    # to implement error handling when the token metadata are None (name, price, current value, cgid)
+# for crypto, holdings in overall_crypto.items():
+#     # Get list of trades involving current crypto token
+#     trades = df_trade[df_trade['Pair'].str.contains(crypto, regex=False)]
+#     # to implement error handling when the token metadata are None (name, price, current value, cgid)
+#     # Past tokens whose money in value > 0 indicates that they were sold/swapped at a LOSS (value indicates loss incurred)
 
 # ** Report **
 print(f"Report generated on: {ch_api.last_update}")
@@ -338,4 +335,4 @@ if (len(current_crypto.keys()) > 0):
     print('-' * 14, 'Crypto Holdings', '-' * 14, sep='\n')
     for k, v in current_crypto.items():
         print(f"{v['Name']} (${k}):")
-        print(f"  Holdings: {v['Overall']}\n  Total money in: ${v['Money In']}\n  Current value: ${v['Current Value']}\n  Average Cost: ${v['Average Cost']}/{k}\n  Current Price: ${v['Price']}/{k}")
+        print(f"  Portfolio Allocation: {v['Portfolio Allocation']}%\n  Holdings: {v['Overall']}\n  Total money in: ${v['Money In']}\n  Current value: ${v['Current Value']}\n  Average Cost: ${v['Average Cost']}/{k}\n  Current Price: ${v['Price']}/{k}")

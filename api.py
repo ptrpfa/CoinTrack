@@ -1,4 +1,3 @@
-from multiprocessing.dummy import current_process
 from config import ch_api_url, cg_api_url
 from datetime import datetime
 import requests, json
