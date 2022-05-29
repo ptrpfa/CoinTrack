@@ -18,29 +18,34 @@ overall_wallet = {
                 }
 overall_crypto = {}
 baseline_crypto = { 
-                    'Bought': 0,        # Total crypto bought 
-                    'Sold': 0,          # Total crypto sold
-                    'Send': 0,          # Total crypto sent to wallet
-                    'Receive': 0,       # Total crypto received from wallet transfer 
-                    'Staked': 0,        # Total crypto staked
-                    'Redeemed': 0,      # Total crypto redeemed from staking
-                    'Earned': 0,        # Total crypto successfully yielded after staking
-                    'Reward': 0,        # Total crypto obtained from rewards
-                    'Referral': 0,      # Total crypto obtained from referral commissions
-                    'Free': 0,          # Total crypto obtained at no cost (rewards, referral commissions, staking yields)
-                    'Fees': 0,          # Total fees paid. Fees are not further broken down into the sub-categories of Transfer Fees / Swap Fees
-                    'Overall': 0,       # Total crypto that user is currently holding on
-                    'Money In': 0,      # For cost basis calculations: Total money (fiat) used to purchase token
-                    'Money Out': 0,     # For cost basis calculations: Temporary storage to track movement of money out (sell/swap transactions)
-                    'Current': 0,       # For cost basis calculations: Temporary storage to track the amount of tokens at any one time
-                    'Average Cost': 0   # For cost basis calculations: Average cost per token ($/token)
+                    'Bought': 0,            # Total crypto bought 
+                    'Sold': 0,              # Total crypto sold
+                    'Send': 0,              # Total crypto sent to wallet
+                    'Receive': 0,           # Total crypto received from wallet transfer 
+                    'Staked': 0,            # Total crypto staked
+                    'Redeemed': 0,          # Total crypto redeemed from staking
+                    'Earned': 0,            # Total crypto successfully yielded after staking
+                    'Reward': 0,            # Total crypto obtained from rewards
+                    'Referral': 0,          # Total crypto obtained from referral commissions
+                    'Free': 0,              # Total crypto obtained at no cost (rewards, referral commissions, staking yields)
+                    'Fees': 0,              # Total fees paid. Fees are not further broken down into the sub-categories of Transfer Fees / Swap Fees
+                    'Overall': 0,           # Total crypto that user is currently holding on
+                    'Money In': 0,          # For cost basis calculations: Total money (fiat) used to purchase token
+                    'Money Out': 0,         # For cost basis calculations: Temporary storage to track movement of money out (sell/swap transactions)
+                    'Current': 0,           # For cost basis calculations: Temporary storage to track the amount of tokens at any one time
+                    'Average Cost': 0,      # For cost basis calculations: Average cost per token ($/token)
+                    'Name': None,           # Token name
+                    'Price': None,          # Current token price (either from Coinhako / Coingecko API)
+                    'Current Value': None,  # Current value of token holdings (if any)
+                    'cgid': None,           # Coingecko ID of token
                 }
-current_crypto = {}
-past_crypto = {}
+current_crypto = {} # Dictionary holding references to crypto tokens that the user current owns (changes made will propagate to overall_crypto and vice versa)
+past_crypto = {}    # Dictionary holding references to crypto tokens that the user owned previously (changes made will propagate to overall_crypto and vice versa)
 
 # ** APIs **
 ch_api = CoinhakoAPI()
 cg_api = CoingeckoAPI()
+# Coinhako token mappings to their equivalent Coingecko IDs (to be stored in a database). Note: $LUNA (Terra Luna Classic) has been delisted from Coinhako wef 27/05/2022, token is still reflected as $LUNA, not $LUNC.
 ch_cgid_mappings = {'1INCH': '1inch', 'AAVE': 'aave', 'ADA': 'cardano', 'ATOM': 'cosmos', 'AVAX': 'avalanche-2', 
                     'AXS': 'axie-infinity', 'BAND': 'band-protocol', 'BAT': 'basic-attention-token', 'BCH': 'bitcoin-cash', 
                     'BNB': 'binancecoin', 'BTC': 'bitcoin', 'BTTC': 'bittorrent', 'CEL': 'celsius-degree-token', 'CHZ': 'chiliz', 
@@ -53,7 +58,7 @@ ch_cgid_mappings = {'1INCH': '1inch', 'AAVE': 'aave', 'ADA': 'cardano', 'ATOM': 
                     'OMG': 'omisego', 'RUNE': 'rune', 'SAND': 'the-sandbox', 'SC': 'siacoin', 'SHIB': 'shiba-inu', 'SNX': 'havven', 
                     'SOL': 'solana', 'SRM': 'serum', 'THETA': 'theta-token', 'UNI': 'uniswap', 'USDC': 'usd-coin', 'USDT': 'tether', 
                     'VET': 'vechain', 'XLM': 'stellar', 'XMR': 'monero', 'XNO': 'nano', 'XRP': 'ripple', 'XTZ': 'tezos', 
-                    'YFI': 'yearn-finance', 'ZEC': 'zcash', 'ZIL': 'zilliqa'} # Coinhako token mappings to their equivalent Coingecko IDs (to be stored in a database)
+                    'YFI': 'yearn-finance', 'ZEC': 'zcash', 'ZIL': 'zilliqa', 'LUNA': 'terra-luna'}
 
 # ** Functions **
 def calculate_token_balance(token_holdings, include_send = False): # Calculate overall token holdings
@@ -234,6 +239,7 @@ for item in js_trade:
             overall_crypto[token_to]['Money In'] += overall_crypto[token_from]['Money Out']
             overall_crypto[token_to]['Average Cost'] = overall_crypto[token_to]['Money In'] / overall_crypto[token_to]['Current']
 
+ch_api.update_prices() # Get current market prices from Coinhako
 # Calculate overall crypto holdings
 for token, holdings in overall_crypto.items():
     # Overall value is rounded to a specified amount of precision to 'quantitively determine' that the user holds a particular token. This is done due to precision inconsistencies within Coinhako's exported files
@@ -267,19 +273,30 @@ for token, holdings in overall_crypto.items():
             current_crypto[token] = overall_crypto[token]
     else:
         past_crypto[token] = overall_crypto[token]
-
-# Calculate current crypto holdings' valuation
-ch_api.update_prices() # Get current market prices from Coinhako
-for token in current_crypto.keys():
-    # implement error handling of tokens that are not listed in Coinhako/delisted (maybe use Coingecko as backup)
-    pass
-    # Add portofolio attributes
-    current_token = ch_api.get_price(token)
-    current_crypto[token]['Name'] = current_token['name']
-    current_crypto[token]['Price'] = float(current_token['sell_price'])
-    current_crypto[token]['Current Value'] = round(current_crypto[token]['Price'] * current_crypto[token]['Overall'], 2)
+    # Get token metadata
+    current_token = ch_api.get_price(token) # get token details from Coinhako API
+    if (current_token != None): # Check if token is supported in Coinhako
+        overall_crypto[token]['Name'] = current_token['name']
+        overall_crypto[token]['Price'] = float(current_token['sell_price'])
+        overall_crypto[token]['Current Value'] = round(overall_crypto[token]['Price'] * overall_crypto[token]['Overall'], 2)
+        if (token in ch_cgid_mappings.keys()): # get Coingecko ID
+            overall_crypto[token]['cgid'] = ch_cgid_mappings[token]
+        else:
+            overall_crypto[token]['cgid'] = cg_api.get_token_cgid(token, holdings['Name'])
+            if (overall_crypto[token]['cgid'] != None):
+                ch_cgid_mappings[token] = overall_crypto[token]['cgid']
+    else:
+        if (token in ch_cgid_mappings.keys()): # Check if the token's equivalent Coingecko ID can be obtained
+            overall_crypto[token]['cgid'] = ch_cgid_mappings[token]
+            token_details = cg_api.get_token_details(overall_crypto[token]['cgid'])
+            overall_crypto[token]['Name'] = token_details['name']
+            overall_crypto[token]['Price'] = float(token_details['price'])
+            overall_crypto[token]['Current Value'] = round(overall_crypto[token]['Price'] * overall_crypto[token]['Overall'], 2)
+# Calculate user's current portfolio (current crypto holdings' valuation)
+for k, v in current_crypto.items():
     # Calculate overall portfolio
-    overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + current_crypto[token]['Current Value'], 2)
+    if (v['Current Value'] != None):
+        overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + v['Current Value'], 2)
 
 # ** Calculate overall investments **
 for k, v in overall_wallet.items(): # Clean up wallet
@@ -305,16 +322,11 @@ for k, v in overall_wallet.items(): # Clean up wallet
 # 3) Free tokens: Redemption (derived overall value, if any), Referral, Reward
 # Past tokens that still have money in value indicates that they were sold at a LOST
 
-# Calculate cost basis of each crypto held
-# for crypto, holdings in current_crypto.items():
-#     # Get list of trades involving current crypto token
-#     trades = df_trade[df_trade['Pair'].str.contains(crypto, regex=False)]
-#     # Get Coingecko ID of token
-#     if (crypto in ch_cgid_mappings.keys()):
-#         cgid = ch_cgid_mappings[crypto]
-#     else:
-#         cgid = cg_api.get_token_cgid(crypto, holdings['Name'])
-#         ch_cgid_mappings[crypto] = cgid # (to implement handling for no match, CGID = None)
+# In-depth token analysis
+for crypto, holdings in overall_crypto.items():
+    # Get list of trades involving current crypto token
+    trades = df_trade[df_trade['Pair'].str.contains(crypto, regex=False)]
+    # to implement error handling when the token metadata are None (name, price, current value, cgid)
 
 # ** Report **
 print (f"Report generated on: {ch_api.last_update}\n")

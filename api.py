@@ -1,3 +1,4 @@
+from multiprocessing.dummy import current_process
 from config import ch_api_url, cg_api_url
 from datetime import datetime
 import requests, json
@@ -23,7 +24,7 @@ class CoinhakoAPI: # Simply for getting prices offered on Coinhako platform
         CoinhakoAPI.last_update = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     def get_price(self, token):
-        return CoinhakoAPI.prices[token.upper()] if token in CoinhakoAPI.prices.keys() else None
+        return CoinhakoAPI.prices[token.upper()] if token.upper() in CoinhakoAPI.prices.keys() else None
 
 class CoingeckoAPI: # For more advanced features
 
@@ -33,6 +34,7 @@ class CoingeckoAPI: # For more advanced features
     
     # Coingeko endpoints
     token_map_url = base_url + '/coins/list'
+    current_price_url = base_url + '/simple/price'
 
     def __init__(self):
         CoingeckoAPI.cg_tokens = json.loads(requests.get(CoingeckoAPI.token_map_url).text)
@@ -55,7 +57,22 @@ class CoingeckoAPI: # For more advanced features
                     break
         return cgid
 
-    def get_token_price(self, token_cgid, date):
+    def get_token_details(self, token_cgid): # Get details for a token (name and current price)
+        details = {'name': None, 'price': None}
+        payload = {'id': token_cgid, 'localization': False, 'tickers': False, 'community_data': False, 'developer_data': False, 'sparkline': False}
+        token_details_url = f'{CoingeckoAPI().base_url}/coins/{token_cgid}'
+        response = json.loads(requests.get(token_details_url, params=payload).text)
+        details['name'] = response['name']
+        details['price'] = response['market_data']['current_price']['sgd']
+        return details
+
+    def get_token_price(self, token_cgid): # Get current price for a token
+        payload = {'ids': token_cgid, 'vs_currencies': 'sgd'}
+        response = json.loads(requests.get(CoingeckoAPI.current_price_url, params=payload).text)
+        current_price = response[token_cgid]['sgd']
+        return current_price
+
+    def get_token_historical_price(self, token_cgid, date): # Get historical price for a token
         payload = {'id': token_cgid, 'date': date, 'localization': False}
         token_history_url = f'{CoingeckoAPI().base_url}/coins/{token_cgid}/history'
         response = json.loads(requests.get(token_history_url, params=payload).text)
