@@ -16,7 +16,7 @@ Better understand your personal cryptocurrency portfolio and transactions made o
 - Token analysis
     - Current token holdings
     - Transactions breakdown
-    - Portfolio allocations
+    - Portfolio allocations (based on overall portfolio value and based on total money invested)
     - Cost basis (minimum price per unit token for user to break even)
 
 ## 🚀 Start here! 

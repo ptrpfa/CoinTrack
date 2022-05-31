@@ -301,11 +301,15 @@ for k, v in current_crypto.items():
     # Calculate overall portfolio
     if (v['Current Value'] != None):
         overall_wallet['Portfolio'] = round(overall_wallet['Portfolio'] + v['Current Value'], 2)
-    # Calculate portfolio allocation
+    # Calculate portfolio allocation (based on total money user invested)
     if (v['Money In'] > 0):
-        overall_crypto[k]['Portfolio Allocation'] = round(100 * (v['Money In'] / total_money_in), 2)
+        overall_crypto[k]['Portfolio Allocation (Money In)'] = round(100 * (v['Money In'] / total_money_in), 2)
     else:
-        overall_crypto[k]['Portfolio Allocation'] = 0
+        overall_crypto[k]['Portfolio Allocation (Money In)'] = 0
+for k, v in current_crypto.items():
+    # Calculate portfolio allocation (based on portfolio valuation, not total money user invested)
+    if (v['Current Value'] != None):
+        current_crypto[k]['Portfolio Allocation'] = round(100 * (v['Current Value'] / overall_wallet['Portfolio']), 2)
 
 # ** Calculate overall investments **
 for k, v in overall_wallet.items(): # Clean up wallet
@@ -337,4 +341,4 @@ if (len(current_crypto.keys()) > 0):
     print('-' * 14, 'Crypto Holdings', '-' * 14, sep='\n')
     for k, v in current_crypto.items():
         print(f"{v['Name']} (${k}):")
-        print(f"  Portfolio Allocation: {v['Portfolio Allocation']}%\n  Holdings: {v['Overall']}\n  Total money in: ${v['Money In']}\n  Current value: ${v['Current Value']}\n  Average Cost: ${v['Average Cost']}/{k}\n  Current Price: ${v['Price']}/{k}")
+        print(f"  Portfolio Allocation (based on portfolio value): {v['Portfolio Allocation']}%\n  Portfolio Allocation (based on total money invested): {v['Portfolio Allocation (Money In)']}%\n  Holdings: {v['Overall']}\n  Total money in: ${v['Money In']}\n  Current value: ${v['Current Value']}\n  Average Cost: ${v['Average Cost']}/{k}\n  Current Price: ${v['Price']}/{k}")
