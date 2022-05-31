@@ -304,6 +304,8 @@ for k, v in current_crypto.items():
     # Calculate portfolio allocation
     if (v['Money In'] > 0):
         overall_crypto[k]['Portfolio Allocation'] = round(100 * (v['Money In'] / total_money_in), 2)
+    else:
+        overall_crypto[k]['Portfolio Allocation'] = 0
 
 # ** Calculate overall investments **
 for k, v in overall_wallet.items(): # Clean up wallet
