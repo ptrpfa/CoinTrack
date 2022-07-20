@@ -90,7 +90,8 @@ df_trade.sort_values(by="Time & Date", inplace=True)
 # Clean wallet history
 df_wallet = pd.read_csv("%s/%s" % (file_dir,file_wallet))
 df_wallet = df_wallet[df_wallet['Status (All)']=='Completed'] # Only get completed transactions
-df_wallet.drop(columns=['Transaction Hash', 'To Address', 'Received by Address', 'Note', 'Status (All)'], inplace=True)
+df_wallet.drop(columns=['Transaction hash/ID', 'To Address', 'Received by Address', 'Note', 'Status (All)'], inplace=True)
+# df_wallet.drop(columns=['Transaction Hash', 'To Address', 'Received by Address', 'Note', 'Status (All)'], inplace=True)
 df_wallet.sort_values(by="Date & Time (*-*)", inplace=True)
 
 # Convert dataframes to json
